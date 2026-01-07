@@ -1,0 +1,11 @@
+{
+  "name": "热量追踪器 - AI驱动的智能热量追踪",
+  "short_name": "热量追踪",
+  "description": "通过AI拍照识别，轻松记录饮食，达成健康目标",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#FAF8F5",
+  "theme_color": "#FF6B35",
+  "orientation": "portrait",
+  "categories": ["health", "fitness", "lifestyle"]
+}
