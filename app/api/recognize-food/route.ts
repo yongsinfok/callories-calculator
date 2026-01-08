@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           },
         ],
         temperature: 0.3,
-        max_tokens: 1024,
+        max_tokens: 4096,
       }),
     });
 
@@ -145,12 +145,20 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     console.log("GLM API response status:", response.status);
+    console.log("GLM API full response:", JSON.stringify(data, null, 2));
     const content = data.choices[0]?.message?.content;
 
     if (!content) {
-      console.error("GLM API returned empty content");
+      console.error("GLM API returned empty content. Full response:", JSON.stringify(data, null, 2));
+      // Check if there's an error in the response
+      if (data.error) {
+        return NextResponse.json(
+          { error: `API错误: ${data.error.message || data.error}` },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { error: "AI返回结果为空" },
+        { error: "AI返回结果为空，请检查API密钥或稍后重试" },
         { status: 500 }
       );
     }
@@ -168,8 +176,15 @@ export async function POST(request: NextRequest) {
       result = JSON.parse(jsonStr);
     } catch (e) {
       console.error("Failed to parse GLM response:", jsonStr);
+      // Check if response might be truncated
+      if (jsonStr.length > 500 && !jsonStr.trim().endsWith("}")) {
+        return NextResponse.json(
+          { error: "AI响应被截断，请减少食物种类后重试" },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { error: "AI返回格式错误" },
+        { error: "AI返回格式错误，请重试" },
         { status: 500 }
       );
     }
