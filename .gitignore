@@ -39,3 +39,5 @@ next-env.d.ts
 **/public/worker-*.js
 **/public/sw.js.map
 **/public/sw.js
+
+.vercel
