@@ -40,14 +40,14 @@ export function EditableValue({
 
   // Get color based on confidence level
   const getColor = () => {
-    if (level === "low") return "text-amber-600";
-    if (level === "medium") return "text-amber-500";
-    return "text-gray-700";
+    if (level === "low") return "text-amber-600 dark:text-amber-400";
+    if (level === "medium") return "text-amber-500 dark:text-amber-500";
+    return "text-gray-700 dark:text-text-dark-primary";
   };
 
   // Get background tint for low confidence
   const getBgColor = () => {
-    if (level === "low" || highlighted) return "bg-amber-50";
+    if (level === "low" || highlighted) return "bg-amber-50 dark:bg-amber-900/20";
     return "";
   };
 
@@ -115,7 +115,7 @@ export function EditableValue({
       onClick={() => !isEditing && setIsEditing(true)}
     >
       {label && (
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+        <label className="block text-xs font-medium text-gray-500 dark:text-text-dark-secondary mb-1.5">
           {label}
         </label>
       )}
@@ -127,16 +127,16 @@ export function EditableValue({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`flex items-center justify-between p-2.5 rounded-lg border-2 border-transparent hover:border-gray-200 hover:bg-white cursor-pointer transition-all ${getColor()}`}
+            className={`flex items-center justify-between p-2.5 rounded-lg border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:bg-white dark:hover:bg-background-dark-secondary cursor-pointer transition-all ${getColor()}`}
           >
             <span className="font-medium text-lg">
               {displayValue}
             </span>
             {showUnit && (
-              <span className="text-sm text-gray-400 ml-1">{unit}</span>
+              <span className="text-sm text-gray-400 dark:text-text-dark-tertiary ml-1">{unit}</span>
             )}
             {(level === "low" || highlighted) && (
-              <span className="ml-2 text-xs text-amber-500">✎</span>
+              <span className="ml-2 text-xs text-amber-500 dark:text-amber-400">✎</span>
             )}
           </motion.div>
         ) : (
@@ -157,7 +157,7 @@ export function EditableValue({
               onKeyDown={handleKeyDown}
               className={`w-full p-2.5 rounded-lg border-2 border-primary text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 ${getColor()} ${getBgColor()}`}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-text-dark-tertiary pointer-events-none">
               {unit}
             </div>
           </motion.div>

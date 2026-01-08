@@ -4,32 +4,54 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Camera, X, Upload, Sparkles } from "lucide-react";
+import { compressImage, formatBytes, getBase64Size } from "@/lib/image-utils";
 
 export default function CameraPage() {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [originalSize, setOriginalSize] = useState<number | null>(null);
+  const [compressedSize, setCompressedSize] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      processFile(file);
+      await processFile(file);
     }
   };
 
-  const processFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  const processFile = async (file: File) => {
+    setIsLoading(true);
+    setOriginalSize(file.size);
+
+    try {
+      // Compress image before processing
+      const compressed = await compressImage(file, {
+        maxSizeMB: 2,
+        maxWidthOrHeight: 1920,
+        quality: 0.85,
+      });
+
+      setCompressedSize(getBase64Size(compressed));
+      setPreview(compressed);
+    } catch (error) {
+      console.error('Failed to compress image:', error);
+      // Fallback to original if compression fails
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCapture = async () => {
-    // For demo, we'll use file upload
-    // In production, you'd integrate with device camera API
-    fileInputRef.current?.click();
+    // Open native camera on mobile devices
+    cameraInputRef.current?.click();
   };
 
   const handleAnalyze = () => {
@@ -81,9 +103,25 @@ export default function CameraPage() {
                 </p>
               </div>
 
+              {/* Compression info */}
+              {compressedSize && originalSize && (
+                <div className="text-center text-sm text-gray-500">
+                  图片已优化
+                  {compressedSize < originalSize && (
+                    <span className="text-green-600 ml-1">
+                      ({formatBytes(originalSize)} → {formatBytes(compressedSize)})
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
-                  onClick={() => setPreview(null)}
+                  onClick={() => {
+                    setPreview(null);
+                    setOriginalSize(null);
+                    setCompressedSize(null);
+                  }}
                   className="btn-secondary flex-1"
                 >
                   重新拍摄
@@ -156,6 +194,15 @@ export default function CameraPage() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            {/* Hidden camera input - opens native camera on mobile */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               onChange={handleFileSelect}
               className="hidden"
             />

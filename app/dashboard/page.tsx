@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface FoodEntry {
   id: string;
@@ -122,26 +123,29 @@ export default function DashboardPage() {
 
   if (loading || isLoadingData) {
     return (
-      <div className="min-h-screen bg-background-cream flex items-center justify-center">
-        <div className="text-text-primary">加载中...</div>
+      <div className="min-h-screen bg-background-cream dark:bg-background-dark flex items-center justify-center">
+        <div className="text-text-primary dark:text-text-dark-primary">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background-cream pb-24">
+    <div className="min-h-screen bg-background-cream dark:bg-background-dark pb-24">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      <header className="bg-white dark:bg-background-dark-secondary border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-display font-bold text-text-primary">
+          <h1 className="text-xl font-display font-bold text-text-primary dark:text-text-dark-primary">
             今日热量
           </h1>
-          <Link
-            href="/profile"
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
-          >
-            <User className="w-5 h-5 text-text-secondary" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link
+              href="/profile"
+              className="w-10 h-10 rounded-full bg-gray-100 dark:bg-background-dark flex items-center justify-center"
+            >
+              <User className="w-5 h-5 text-text-secondary dark:text-text-dark-secondary" />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -150,7 +154,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-3xl p-8 mb-6 shadow-sm border border-gray-100"
+          className="bg-white dark:bg-background-dark-secondary rounded-3xl p-8 mb-6 shadow-sm border border-gray-100 dark:border-gray-800"
         >
           <div className="flex items-center justify-center mb-6">
             <div className="relative">
@@ -162,6 +166,7 @@ export default function DashboardPage() {
                   stroke="#F3F4F6"
                   strokeWidth="12"
                   fill="none"
+                  className="dark:stroke-gray-800"
                 />
                 <motion.circle
                   cx="96"
@@ -191,30 +196,30 @@ export default function DashboardPage() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Flame className="w-8 h-8 text-primary mb-2" />
-                <p className="text-4xl font-display font-bold text-text-primary">
+                <p className="text-4xl font-display font-bold text-text-primary dark:text-text-dark-primary">
                   {totalCalories}
                 </p>
-                <p className="text-sm text-text-secondary">/ {profile?.daily_calorie_target}</p>
+                <p className="text-sm text-text-secondary dark:text-text-dark-secondary">/ {profile?.daily_calorie_target}</p>
               </div>
             </div>
           </div>
 
           <div className="text-center">
-            <p className="text-text-secondary text-sm mb-1">还可摄入</p>
-            <p className="text-3xl font-display font-bold text-text-primary">
+            <p className="text-text-secondary dark:text-text-dark-secondary text-sm mb-1">还可摄入</p>
+            <p className="text-3xl font-display font-bold text-text-primary dark:text-text-dark-primary">
               {remainingCalories > 0 ? remainingCalories : 0}
             </p>
-            <p className="text-text-secondary text-sm">大卡</p>
+            <p className="text-text-secondary dark:text-text-dark-secondary text-sm">大卡</p>
           </div>
         </motion.div>
 
         {/* Food Entries List */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-display font-semibold text-text-primary">
+            <h2 className="text-lg font-display font-semibold text-text-primary dark:text-text-dark-primary">
               今日记录
             </h2>
-            <span className="text-sm text-text-secondary">
+            <span className="text-sm text-text-secondary dark:text-text-dark-secondary">
               {entries.length} 餐
             </span>
           </div>
@@ -227,11 +232,11 @@ export default function DashboardPage() {
                 exit={{ opacity: 0 }}
                 className="text-center py-12"
               >
-                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                  <Calendar className="w-8 h-8 text-text-tertiary" />
+                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-background-dark-secondary flex items-center justify-center mx-auto mb-4">
+                  <Calendar className="w-8 h-8 text-text-tertiary dark:text-text-dark-tertiary" />
                 </div>
-                <p className="text-text-secondary mb-2">今天还没有记录</p>
-                <p className="text-text-tertiary text-sm">
+                <p className="text-text-secondary dark:text-text-dark-secondary mb-2">今天还没有记录</p>
+                <p className="text-text-tertiary dark:text-text-dark-tertiary text-sm">
                   点击下方按钮开始记录
                 </p>
               </motion.div>
@@ -244,7 +249,7 @@ export default function DashboardPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -100 }}
-                    className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100"
+                    className="bg-white dark:bg-background-dark-secondary rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -253,10 +258,10 @@ export default function DashboardPage() {
                             {getMealTypeLabel(entry.meal_type || "snack")}
                           </span>
                         </div>
-                        <h3 className="font-semibold text-text-primary mb-1">
+                        <h3 className="font-semibold text-text-primary dark:text-text-dark-primary mb-1">
                           {entry.food_name}
                         </h3>
-                        <p className="text-text-primary font-display font-bold">
+                        <p className="text-text-primary dark:text-text-dark-primary font-display font-bold">
                           {entry.calories} 大卡
                         </p>
                       </div>

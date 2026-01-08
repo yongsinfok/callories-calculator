@@ -273,28 +273,28 @@ function ConfirmContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background-cream flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-background-cream dark:bg-background-dark flex flex-col items-center justify-center p-6">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
           className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent mb-4"
         />
-        <p className="text-text-primary font-medium">AI 正在识别食物...</p>
-        <p className="text-text-secondary text-sm mt-2">通常需要 3-5 秒</p>
+        <p className="text-text-primary dark:text-text-dark-primary font-medium">AI 正在识别食物...</p>
+        <p className="text-text-secondary dark:text-text-dark-secondary text-sm mt-2">通常需要 3-5 秒</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background-cream flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-background-cream dark:bg-background-dark flex flex-col items-center justify-center p-6">
         <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mb-4">
           <Sparkles className="w-8 h-8 text-error" />
         </div>
-        <h2 className="text-xl font-display font-bold text-text-primary mb-2">
+        <h2 className="text-xl font-display font-bold text-text-primary dark:text-text-dark-primary mb-2">
           识别失败
         </h2>
-        <p className="text-text-secondary text-center mb-6">{error}</p>
+        <p className="text-text-secondary dark:text-text-dark-secondary text-center mb-6">{error}</p>
         <div className="flex gap-3">
           <button onClick={() => router.back()} className="btn-secondary">
             返回
@@ -309,14 +309,14 @@ function ConfirmContent() {
 
   if (!result || editableFoods.length === 0) {
     return (
-      <div className="min-h-screen bg-background-cream flex flex-col items-center justify-center p-6">
-        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-          <Camera className="w-8 h-8 text-gray-400" />
+      <div className="min-h-screen bg-background-cream dark:bg-background-dark flex flex-col items-center justify-center p-6">
+        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-background-dark-secondary flex items-center justify-center mb-4">
+          <Camera className="w-8 h-8 text-gray-400 dark:text-text-dark-tertiary" />
         </div>
-        <h2 className="text-xl font-display font-bold text-text-primary mb-2">
+        <h2 className="text-xl font-display font-bold text-text-primary dark:text-text-dark-primary mb-2">
           没有检测到食物
         </h2>
-        <p className="text-text-secondary text-center mb-6">
+        <p className="text-text-secondary dark:text-text-dark-secondary text-center mb-6">
           AI 未能识别出图片中的食物
         </p>
         <div className="flex gap-3">
@@ -338,17 +338,17 @@ function ConfirmContent() {
   );
 
   return (
-    <div className="min-h-screen bg-background-cream">
+    <div className="min-h-screen bg-background-cream dark:bg-background-dark">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      <header className="bg-white dark:bg-background-dark-secondary border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-background-dark flex items-center justify-center"
           >
-            <ArrowLeft className="w-5 h-5 text-text-primary" />
+            <ArrowLeft className="w-5 h-5 text-text-primary dark:text-text-dark-primary" />
           </button>
-          <h1 className="text-lg font-display font-semibold text-text-primary">
+          <h1 className="text-lg font-display font-semibold text-text-primary dark:text-text-dark-primary">
             确认食物
           </h1>
         </div>
@@ -357,13 +357,13 @@ function ConfirmContent() {
       <main className="max-w-lg mx-auto px-4 py-6 pb-32">
         {/* Image preview */}
         <div className="mb-6">
-          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800">
             <img src={image} alt="Food" className="w-full h-48 object-cover" />
           </div>
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2 text-sm">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span className="font-medium text-gray-700">
+              <span className="font-medium text-gray-700 dark:text-text-dark-secondary">
                 AI 检测到 {editableFoods.length} 种食物
               </span>
             </div>
@@ -372,7 +372,7 @@ function ConfirmContent() {
 
         {/* Meal type selector */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-text-primary mb-3">
+          <label className="block text-sm font-medium text-text-primary dark:text-text-dark-primary mb-3">
             餐型
           </label>
           <div className="grid grid-cols-4 gap-2">
@@ -383,7 +383,7 @@ function ConfirmContent() {
                 className={`py-3 px-4 rounded-xl text-sm font-medium transition-all ${
                   selectedMealType === meal
                     ? "bg-primary text-white"
-                    : "bg-white text-text-secondary hover:bg-gray-50"
+                    : "bg-white dark:bg-background-dark-secondary text-text-secondary dark:text-text-dark-secondary hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
                 {meal === "breakfast" && "早餐"}
@@ -397,7 +397,7 @@ function ConfirmContent() {
 
         {/* Food items */}
         <div className="space-y-4">
-          <h2 className="text-lg font-display font-semibold text-text-primary">
+          <h2 className="text-lg font-display font-semibold text-text-primary dark:text-text-dark-primary">
             食物详情
           </h2>
 
@@ -429,7 +429,7 @@ function ConfirmContent() {
       </main>
 
       {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-background-dark-secondary border-t border-gray-100 dark:border-gray-800 p-4">
         <div className="max-w-lg mx-auto">
           <button
             onClick={handleSave}
@@ -475,7 +475,7 @@ export default function ConfirmPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-background-cream flex items-center justify-center">
+        <div className="min-h-screen bg-background-cream dark:bg-background-dark flex items-center justify-center">
           加载中...
         </div>
       }

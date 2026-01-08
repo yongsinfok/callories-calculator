@@ -12,6 +12,10 @@
     @apply bg-background-cream text-text-primary font-sans antialiased;
   }
 
+  .dark body {
+    @apply bg-background-dark text-text-dark-primary;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
   }
@@ -26,12 +30,24 @@
     @apply bg-gray-100 hover:bg-gray-200 text-text-primary font-semibold py-3 px-6 rounded-xl transition-all duration-200 active:scale-95;
   }
 
+  .dark .btn-secondary {
+    @apply bg-background-dark-secondary hover:bg-gray-700 text-text-dark-primary;
+  }
+
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
   }
 
+  .dark .card {
+    @apply bg-background-dark-secondary border-gray-800;
+  }
+
   .input {
     @apply w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all;
+  }
+
+  .dark .input {
+    @apply bg-background-dark border-gray-700 text-text-dark-primary placeholder:text-text-dark-tertiary;
   }
 
   .progress-ring {
@@ -74,4 +90,16 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #2D2D2D;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #777;
 }

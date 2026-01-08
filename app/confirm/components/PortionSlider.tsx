@@ -39,8 +39,8 @@ export function PortionSlider({
   };
 
   const getTextColor = () => {
-    if (percentage < 75) return "text-blue-600";
-    if (percentage > 125) return "text-orange-600";
+    if (percentage < 75) return "text-blue-600 dark:text-blue-400";
+    if (percentage > 125) return "text-orange-600 dark:text-orange-400";
     return "text-primary";
   };
 
@@ -137,11 +137,11 @@ export function PortionSlider({
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => setIsOpen(true)}
-          className={`w-full flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-gray-200 hover:border-primary hover:bg-primary/5 transition-all ${getTextColor()}`}
+          className={`w-full flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary hover:bg-primary/5 transition-all ${getTextColor()}`}
         >
-          <span className="text-sm font-medium">分量调整</span>
+          <span className="text-sm font-medium dark:text-text-dark-primary">分量调整</span>
           <div className="flex items-center gap-2">
-            <span className="text-sm">
+            <span className="text-sm dark:text-text-dark-primary">
               {value}g
               {percentage !== 100 && (
                 <span className="ml-1">
@@ -161,14 +161,14 @@ export function PortionSlider({
             initial={{ opacity: 0, y: -10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
             exit={{ opacity: 0, y: -10, height: 0 }}
-            className="bg-white rounded-xl border border-gray-200 p-4 space-y-4"
+            className="bg-white dark:bg-background-dark-secondary rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4"
           >
             {/* Header with close button */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">分量调整</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-text-dark-primary">分量调整</span>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 dark:text-text-dark-tertiary hover:text-gray-600 dark:hover:text-text-dark-secondary transition-colors"
               >
                 <ChevronDown className="w-4 h-4 rotate-180" />
               </button>
@@ -179,7 +179,7 @@ export function PortionSlider({
               <span className={`text-2xl font-bold ${getTextColor()}`}>
                 {value}g
               </span>
-              <span className="text-sm text-gray-500 ml-2">
+              <span className="text-sm text-gray-500 dark:text-text-dark-secondary ml-2">
                 {percentage > 100 ? "+" : ""}{percentage - 100}%
               </span>
             </div>
@@ -187,7 +187,7 @@ export function PortionSlider({
             {/* Slider track */}
             <div
               ref={trackRef}
-              className="relative h-8 bg-gray-100 rounded-full cursor-pointer select-none"
+              className="relative h-8 bg-gray-100 dark:bg-gray-800 rounded-full cursor-pointer select-none"
               onMouseDown={handleMouseDown}
               onTouchStart={handleTouchStart}
             >
@@ -202,7 +202,7 @@ export function PortionSlider({
               {/* Thumb */}
               <motion.div
                 ref={sliderRef}
-                className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 ${getColor()} rounded-full shadow-lg border-2 border-white cursor-grab active:cursor-grabbing`}
+                className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 ${getColor()} rounded-full shadow-lg border-2 border-white dark:border-gray-900 cursor-grab active:cursor-grabbing`}
                 style={{ left: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
                 animate={{ left: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -214,7 +214,7 @@ export function PortionSlider({
                 return (
                   <div
                     key={preset.value}
-                    className="absolute top-0 bottom-0 w-0.5 bg-gray-300"
+                    className="absolute top-0 bottom-0 w-0.5 bg-gray-300 dark:bg-gray-700"
                     style={{ left: `${left}%` }}
                   />
                 );
@@ -234,7 +234,7 @@ export function PortionSlider({
                   className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     percentage === preset.value
                       ? `${getTextColor()} ${getColor()} text-white`
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      : "bg-gray-100 dark:bg-background-dark text-gray-600 dark:text-text-dark-secondary hover:bg-gray-200 dark:hover:bg-gray-800"
                   }`}
                 >
                   {preset.label}

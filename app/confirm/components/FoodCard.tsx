@@ -100,9 +100,9 @@ export function FoodCard({
         initial={{ opacity: 1, scale: 1 }}
         animate={{ opacity: 0, scale: 0.9 }}
         transition={{ duration: 0.3 }}
-        className="bg-gray-100 rounded-2xl p-5 border-2 border-dashed border-gray-300"
+        className="bg-gray-100 dark:bg-background-dark-secondary rounded-2xl p-5 border-2 border-dashed border-gray-300 dark:border-gray-700"
       >
-        <div className="flex items-center justify-center gap-2 text-gray-500">
+        <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-text-dark-tertiary">
           <Undo2 className="w-4 h-4" />
           <button
             onClick={handleUndo}
@@ -121,8 +121,8 @@ export function FoodCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`bg-white rounded-2xl p-5 shadow-sm border-2 transition-all ${
-        food.confidence < 50 ? "border-red-200" : "border-gray-100"
+      className={`bg-white dark:bg-background-dark-secondary rounded-2xl p-5 shadow-sm border-2 transition-all ${
+        food.confidence < 50 ? "border-red-200 dark:border-red-800" : "border-gray-100 dark:border-gray-800"
       }`}
     >
       {/* Card header with name and confidence */}
@@ -132,7 +132,7 @@ export function FoodCard({
             type="text"
             value={food.food_name}
             onChange={(e) => handleNameChange(e.target.value)}
-            className="text-lg font-display font-semibold text-gray-800 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-1 -mx-1 w-full"
+            className="text-lg font-display font-semibold text-gray-800 dark:text-text-dark-primary bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-primary/20 rounded px-1 -mx-1 w-full"
           />
         </div>
         <ConfidenceBadge confidence={food.confidence} size="sm" />
@@ -143,9 +143,9 @@ export function FoodCard({
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="mb-4 p-3 bg-red-50 rounded-lg border border-red-100"
+          className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800"
         >
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-red-700 dark:text-red-400">
             ⚠️ AI 对此食物的识别不确定，请仔细检查或重新拍照
           </p>
         </motion.div>
@@ -226,10 +226,10 @@ export function FoodCard({
 
       {/* Delete button */}
       {showDelete && (
-        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
           <button
             onClick={handleDelete}
-            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
+            className="flex items-center gap-1.5 text-sm text-gray-400 dark:text-text-dark-tertiary hover:text-red-500 dark:hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
           >
             <Trash2 className="w-4 h-4" />
             删除此项
