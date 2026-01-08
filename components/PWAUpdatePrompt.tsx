@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X, RefreshCw } from "lucide-react";
+import { Download, X, RefreshCw, Check } from "lucide-react";
 
 interface PWAUpdatePromptProps {
   className?: string;
@@ -11,6 +11,13 @@ interface PWAUpdatePromptProps {
 export function PWAUpdatePrompt({ className }: PWAUpdatePromptProps) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [autoUpdate, setAutoUpdate] = useState(false);
+
+  useEffect(() => {
+    // Load auto-update preference
+    const savedAutoUpdate = localStorage.getItem("pwa-auto-update") === "true";
+    setAutoUpdate(savedAutoUpdate);
+  }, []);
 
   useEffect(() => {
     // Listen for service worker updates
@@ -23,7 +30,10 @@ export function PWAUpdatePrompt({ className }: PWAUpdatePromptProps) {
 
       // Listen for the custom update event from our service worker registration
       const handleUpdateAvailable = () => {
-        setShowPrompt(true);
+        // Don't show prompt if auto-update is enabled
+        if (localStorage.getItem("pwa-auto-update") !== "true") {
+          setShowPrompt(true);
+        }
       };
 
       window.addEventListener("sw-update-available", handleUpdateAvailable);
@@ -50,6 +60,21 @@ export function PWAUpdatePrompt({ className }: PWAUpdatePromptProps) {
 
   const handleDismiss = () => {
     setShowPrompt(false);
+  };
+
+  const handleAutoUpdateToggle = () => {
+    const newValue = !autoUpdate;
+    setAutoUpdate(newValue);
+    localStorage.setItem("pwa-auto-update", String(newValue));
+
+    // If enabling auto-update, apply it immediately if there's a waiting SW
+    if (newValue && typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration && registration.waiting) {
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    }
   };
 
   return (
@@ -112,6 +137,19 @@ export function PWAUpdatePrompt({ className }: PWAUpdatePromptProps) {
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Auto-update toggle */}
+              <button
+                onClick={handleAutoUpdateToggle}
+                className="flex items-center gap-2 mt-3 text-sm text-white/80 hover:text-white transition-colors"
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                  autoUpdate ? "bg-white border-white" : "border-white/50"
+                }`}>
+                  {autoUpdate && <Check className="w-3 h-3 text-primary" />}
+                </div>
+                <span>下次自动更新</span>
+              </button>
 
               {/* Action buttons */}
               <div className="flex gap-3 mt-4">

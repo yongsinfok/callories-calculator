@@ -15,10 +15,27 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         const registration = await navigator.serviceWorker.getRegistration();
 
         if (registration) {
+          // Check user's preference for auto-update
+          const autoUpdate = localStorage.getItem("pwa-auto-update") === "true";
+
+          // Function to check for updates
+          const checkForUpdates = async () => {
+            try {
+              await registration.update();
+            } catch {
+              // Ignore update failures (might be offline)
+            }
+          };
+
           // Listen for the waiting service worker
           const showUpdateIfWaiting = () => {
             if (registration.waiting) {
-              window.dispatchEvent(new CustomEvent("sw-update-available"));
+              if (autoUpdate) {
+                // Automatically activate new service worker
+                registration.waiting.postMessage({ type: "SKIP_WAITING" });
+              } else {
+                window.dispatchEvent(new CustomEvent("sw-update-available"));
+              }
             }
           };
 
@@ -33,7 +50,12 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
             newWorker.addEventListener("statechange", () => {
               if (newWorker.state === "installed" && registration.waiting) {
                 // New version is ready
-                window.dispatchEvent(new CustomEvent("sw-update-available"));
+                if (autoUpdate) {
+                  // Auto-update: skip waiting and reload
+                  registration.waiting.postMessage({ type: "SKIP_WAITING" });
+                } else {
+                  window.dispatchEvent(new CustomEvent("sw-update-available"));
+                }
               }
             });
           });
@@ -48,13 +70,19 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
           // Check for updates when window gets focus
           const handleFocus = () => {
-            registration.update().catch(() => {});
+            checkForUpdates();
           };
-
           window.addEventListener("focus", handleFocus);
+
+          // Periodic update check (every 10 minutes)
+          const updateInterval = setInterval(checkForUpdates, 10 * 60 * 1000);
+
+          // Initial check after a short delay
+          setTimeout(checkForUpdates, 5000);
 
           return () => {
             window.removeEventListener("focus", handleFocus);
+            clearInterval(updateInterval);
           };
         }
       } catch (error) {
