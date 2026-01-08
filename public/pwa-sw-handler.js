@@ -1,5 +1,9 @@
-// Custom service worker logic for handling updates
-// This is appended to the auto-generated service worker by next-pwa
+// Custom service worker logic for PWA update handling
+// This file is used by next-pwa as swSrc
+
+// Placeholder for next-pwa to inject the precache manifest
+// prettier-ignore
+self.__WB_MANIFEST = [];
 
 // Listen for messages from clients
 self.addEventListener("message", (event) => {
