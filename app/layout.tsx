@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Outfit, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
+import { PWAProvider } from "@/components/providers/PWAProvider";
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -39,7 +41,10 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className={`${outfit.variable} ${plusJakartaSans.variable}`}>
-        <SupabaseProvider>{children}</SupabaseProvider>
+        <PWAProvider>
+          <SupabaseProvider>{children}</SupabaseProvider>
+          <PWAUpdatePrompt />
+        </PWAProvider>
       </body>
     </html>
   );
