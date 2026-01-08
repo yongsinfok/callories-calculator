@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/SupabaseProvider";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Camera } from "lucide-react";
+import {
+  FoodEntry,
+  RecognitionResult,
+  ConfidenceValue,
+} from "./types";
+import { FoodCard, ConfidenceBadge } from "./components";
 
-interface FoodItem {
+// Legacy interface for backward compatibility
+interface LegacyFoodItem {
   food_name: string;
   estimated_weight_g: number;
   calories: number;
@@ -16,10 +23,73 @@ interface FoodItem {
   fat_g: number;
 }
 
-interface RecognitionResult {
-  foods: FoodItem[];
+interface LegacyRecognitionResult {
+  foods: LegacyFoodItem[];
   total_calories: number;
   confidence: "high" | "medium" | "low";
+}
+
+// Normalize legacy or new API response to FoodEntry format
+function normalizeFoodEntry(
+  food: any,
+  index: number
+): FoodEntry {
+  // Check if already in new format
+  if (
+    food.estimated_weight_g &&
+    typeof food.estimated_weight_g === "object" &&
+    "value" in food.estimated_weight_g
+  ) {
+    return {
+      id: `food-${index}-${Date.now()}`,
+      food_name: food.food_name,
+      confidence: food.confidence ?? 75,
+      estimated_weight_g: food.estimated_weight_g,
+      calories: food.calories,
+      protein_g: food.protein_g,
+      carbs_g: food.carbs_g,
+      fat_g: food.fat_g,
+    };
+  }
+
+  // Legacy format - convert to new format
+  const legacyConfidence = food.confidence ?? 75;
+  const getConfidenceScore = (baseConfidence?: number): number => {
+    const conf = baseConfidence ?? legacyConfidence;
+    if (typeof conf === "string") {
+      // Convert "high"/"medium"/"low" to number
+      if (conf === "high") return 90;
+      if (conf === "medium") return 65;
+      return 40;
+    }
+    return conf;
+  };
+
+  return {
+    id: `food-${index}-${Date.now()}`,
+    food_name: food.food_name,
+    confidence: legacyConfidence,
+    estimated_weight_g: {
+      value: food.estimated_weight_g,
+      confidence: getConfidenceScore(food.estimated_weight_g_confidence),
+    },
+    calories: {
+      value: food.calories,
+      confidence: getConfidenceScore(food.calories_confidence),
+    },
+    protein_g: {
+      value: food.protein_g,
+      confidence: getConfidenceScore(food.protein_g_confidence),
+    },
+    carbs_g: {
+      value: food.carbs_g,
+      confidence: getConfidenceScore(food.carbs_g_confidence),
+    },
+    fat_g: {
+      value: food.fat_g,
+      confidence: getConfidenceScore(food.fat_g_confidence),
+    },
+  };
 }
 
 function ConfirmContent() {
@@ -30,10 +100,15 @@ function ConfirmContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<RecognitionResult | null>(null);
+  const [editableFoods, setEditableFoods] = useState<FoodEntry[]>([]);
+  const [deletedFoods, setDeletedFoods] = useState<Map<number, FoodEntry>>(new Map());
   const [selectedMealType, setSelectedMealType] = useState<
     "breakfast" | "lunch" | "dinner" | "snack"
   >("lunch");
-  const [editableFoods, setEditableFoods] = useState<FoodItem[]>([]);
+  const [undoToast, setUndoToast] = useState<{ show: boolean; foodName: string }>({
+    show: false,
+    foodName: "",
+  });
   const hasInitialized = useRef(false);
 
   useEffect(() => {
@@ -69,8 +144,17 @@ function ConfirmContent() {
         throw new Error(data.error || "识别失败");
       }
 
-      setResult(data);
-      setEditableFoods(data.foods);
+      // Normalize foods to new format
+      const normalizedFoods = data.foods.map(
+        (food: any, index: number) => normalizeFoodEntry(food, index)
+      );
+
+      setResult({
+        foods: normalizedFoods,
+        total_calories: data.total_calories,
+      });
+      setEditableFoods(normalizedFoods);
+
       // Clear sessionStorage after successful recognition
       sessionStorage.removeItem("foodImage");
     } catch (err: any) {
@@ -80,11 +164,52 @@ function ConfirmContent() {
     }
   };
 
-  const handleFoodChange = (index: number, field: keyof FoodItem, value: string | number) => {
-    const newFoods = [...editableFoods];
-    (newFoods[index][field] as any) = value;
-    setEditableFoods(newFoods);
-  };
+  // Update a specific field in a food entry
+  const handleFoodUpdate = useCallback(
+    (index: number, field: keyof FoodEntry, value: any) => {
+      setEditableFoods((prev) => {
+        const newFoods = [...prev];
+        const food = { ...newFoods[index] };
+        (food as any)[field] = value;
+        newFoods[index] = food;
+        return newFoods;
+      });
+    },
+    []
+  );
+
+  // Handle delete food
+  const handleDeleteFood = useCallback((index: number) => {
+    setEditableFoods((prev) => {
+      const food = prev[index];
+      const newDeleted = new Map(deletedFoods);
+      newDeleted.set(index, food);
+      setDeletedFoods(newDeleted);
+
+      // Show undo toast
+      setUndoToast({ show: true, foodName: food.food_name });
+      setTimeout(() => setUndoToast({ show: false, foodName: "" }), 3000);
+
+      return prev.filter((_, i) => i !== index);
+    });
+  }, [deletedFoods]);
+
+  // Handle undo delete
+  const handleUndoDelete = useCallback(() => {
+    if (deletedFoods.size > 0) {
+      const lastEntry = Array.from(deletedFoods).pop();
+      if (lastEntry) {
+        const [index, food] = lastEntry;
+        setEditableFoods((prev) => [...prev, food]);
+        setDeletedFoods((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(index);
+          return newMap;
+        });
+        setUndoToast({ show: false, foodName: "" });
+      }
+    }
+  }, [deletedFoods]);
 
   const handleSave = async () => {
     if (!user) {
@@ -103,12 +228,12 @@ function ConfirmContent() {
         await supabase.from("food_entries").insert({
           user_id: user.id,
           food_name: food.food_name,
-          calories: food.calories,
-          protein_g: food.protein_g,
-          carbs_g: food.carbs_g,
-          fat_g: food.fat_g,
+          calories: food.calories.value,
+          protein_g: food.protein_g.value,
+          carbs_g: food.carbs_g.value,
+          fat_g: food.fat_g.value,
           meal_type: selectedMealType,
-          estimated_weight_g: food.estimated_weight_g,
+          estimated_weight_g: food.estimated_weight_g.value,
           entry_date: today,
         });
 
@@ -120,16 +245,16 @@ function ConfirmContent() {
               user_id: user.id,
               food_name: food.food_name,
               calories_per_100g: Math.round(
-                (food.calories / food.estimated_weight_g) * 100
+                (food.calories.value / food.estimated_weight_g.value) * 100
               ),
               protein_g_per_100g: parseFloat(
-                ((food.protein_g / food.estimated_weight_g) * 100).toFixed(2)
+                ((food.protein_g.value / food.estimated_weight_g.value) * 100).toFixed(2)
               ),
               carbs_g_per_100g: parseFloat(
-                ((food.carbs_g / food.estimated_weight_g) * 100).toFixed(2)
+                ((food.carbs_g.value / food.estimated_weight_g.value) * 100).toFixed(2)
               ),
               fat_g_per_100g: parseFloat(
-                ((food.fat_g / food.estimated_weight_g) * 100).toFixed(2)
+                ((food.fat_g.value / food.estimated_weight_g.value) * 100).toFixed(2)
               ),
             },
             {
@@ -143,32 +268,6 @@ function ConfirmContent() {
       setError(err.message || "保存失败，请重试");
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const getConfidenceColor = (confidence: string) => {
-    switch (confidence) {
-      case "high":
-        return "text-success";
-      case "medium":
-        return "text-warning";
-      case "low":
-        return "text-error";
-      default:
-        return "text-text-secondary";
-    }
-  };
-
-  const getConfidenceLabel = (confidence: string) => {
-    switch (confidence) {
-      case "high":
-        return "高置信度";
-      case "medium":
-        return "中等置信度";
-      case "low":
-        return "低置信度";
-      default:
-        return "";
     }
   };
 
@@ -190,7 +289,7 @@ function ConfirmContent() {
     return (
       <div className="min-h-screen bg-background-cream flex flex-col items-center justify-center p-6">
         <div className="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mb-4">
-          <AlertCircle className="w-8 h-8 text-error" />
+          <Sparkles className="w-8 h-8 text-error" />
         </div>
         <h2 className="text-xl font-display font-bold text-text-primary mb-2">
           识别失败
@@ -209,8 +308,34 @@ function ConfirmContent() {
   }
 
   if (!result || editableFoods.length === 0) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background-cream flex flex-col items-center justify-center p-6">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+          <Camera className="w-8 h-8 text-gray-400" />
+        </div>
+        <h2 className="text-xl font-display font-bold text-text-primary mb-2">
+          没有检测到食物
+        </h2>
+        <p className="text-text-secondary text-center mb-6">
+          AI 未能识别出图片中的食物
+        </p>
+        <div className="flex gap-3">
+          <button onClick={() => router.back()} className="btn-secondary">
+            返回
+          </button>
+          <button onClick={() => router.push("/camera")} className="btn-primary">
+            重新拍照
+          </button>
+        </div>
+      </div>
+    );
   }
+
+  // Calculate total calories from editable foods
+  const totalCalories = editableFoods.reduce(
+    (sum, food) => sum + food.calories.value,
+    0
+  );
 
   return (
     <div className="min-h-screen bg-background-cream">
@@ -238,13 +363,10 @@ function ConfirmContent() {
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2 text-sm">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span className={`font-medium ${getConfidenceColor(result.confidence)}`}>
-                {getConfidenceLabel(result.confidence)}
+              <span className="font-medium text-gray-700">
+                AI 检测到 {editableFoods.length} 种食物
               </span>
             </div>
-            <span className="text-text-secondary text-sm">
-              共 {editableFoods.length} 种食物
-            </span>
           </div>
         </div>
 
@@ -281,115 +403,13 @@ function ConfirmContent() {
 
           <AnimatePresence mode="popLayout">
             {editableFoods.map((food, index) => (
-              <motion.div
-                key={index}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4"
-              >
-                {/* Food name */}
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-2">
-                    食物名称
-                  </label>
-                  <input
-                    type="text"
-                    value={food.food_name}
-                    onChange={(e) => handleFoodChange(index, "food_name", e.target.value)}
-                    className="input"
-                  />
-                </div>
-
-                {/* Weight and calories */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-2">
-                      估算重量 (克)
-                    </label>
-                    <input
-                      type="number"
-                      value={food.estimated_weight_g}
-                      onChange={(e) =>
-                        handleFoodChange(index, "estimated_weight_g", parseFloat(e.target.value) || 0)
-                      }
-                      className="input"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-2">
-                      热量 (大卡)
-                    </label>
-                    <input
-                      type="number"
-                      value={food.calories}
-                      onChange={(e) =>
-                        handleFoodChange(index, "calories", parseInt(e.target.value) || 0)
-                      }
-                      className="input"
-                    />
-                  </div>
-                </div>
-
-                {/* Macros */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-2">
-                      蛋白质
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={food.protein_g}
-                        onChange={(e) =>
-                          handleFoodChange(index, "protein_g", parseFloat(e.target.value) || 0)
-                        }
-                        className="input pr-8"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-tertiary">
-                        g
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-2">
-                      碳水
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={food.carbs_g}
-                        onChange={(e) =>
-                          handleFoodChange(index, "carbs_g", parseFloat(e.target.value) || 0)
-                        }
-                        className="input pr-8"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-tertiary">
-                        g
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-2">
-                      脂肪
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={food.fat_g}
-                        onChange={(e) =>
-                          handleFoodChange(index, "fat_g", parseFloat(e.target.value) || 0)
-                        }
-                        className="input pr-8"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-tertiary">
-                        g
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <FoodCard
+                key={food.id}
+                food={food}
+                index={index}
+                onUpdate={handleFoodUpdate}
+                onDelete={handleDeleteFood}
+              />
             ))}
           </AnimatePresence>
         </div>
@@ -402,7 +422,7 @@ function ConfirmContent() {
         >
           <p className="text-white/80 text-sm mb-1">总计热量</p>
           <p className="text-4xl font-display font-bold">
-            {editableFoods.reduce((sum, food) => sum + food.calories, 0)}
+            {totalCalories}
             <span className="text-lg font-normal"> 大卡</span>
           </p>
         </motion.div>
@@ -427,13 +447,39 @@ function ConfirmContent() {
           </button>
         </div>
       </div>
+
+      {/* Undo toast */}
+      <AnimatePresence>
+        {undoToast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-24 left-4 right-4 max-w-lg mx-auto bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg flex items-center justify-between"
+          >
+            <span className="text-sm">已删除 "{undoToast.foodName}"</span>
+            <button
+              onClick={handleUndoDelete}
+              className="text-primary font-medium text-sm hover:underline"
+            >
+              撤销
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 export default function ConfirmPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background-cream flex items-center justify-center">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background-cream flex items-center justify-center">
+          加载中...
+        </div>
+      }
+    >
       <ConfirmContent />
     </Suspense>
   );

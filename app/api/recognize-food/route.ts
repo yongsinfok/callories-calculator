@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface ConfidenceValue {
+  value: number;
+  confidence: number;
+}
+
 interface GLMFoodItem {
   food_name: string;
-  estimated_weight_g: number;
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fat_g: number;
+  confidence: number;
+  estimated_weight_g: number | ConfidenceValue;
+  calories: number | ConfidenceValue;
+  protein_g: number | ConfidenceValue;
+  carbs_g: number | ConfidenceValue;
+  fat_g: number | ConfidenceValue;
 }
 
 interface GLMResponse {
   foods: GLMFoodItem[];
   total_calories: number;
-  confidence: "high" | "medium" | "low";
 }
 
 interface GLMErrorResponse {
@@ -26,23 +31,29 @@ const PROMPT = `你是一个专业的营养分析助手。请分析这张图片�
 1. 识别所有可见的食物
 2. 估算每种食物的重量（克）
 3. 计算热量和营养成分
-4. 如果是多食物，返回数组
+4. 为每个食物和每个营养值提供置信度分数（0-100）
 
 返回格式（严格遵守）:
 {
   "foods": [
     {
       "food_name": "食物名称",
-      "estimated_weight_g": 估算重量,
-      "calories": 热量(大卡),
-      "protein_g": 蛋白质(克),
-      "carbs_g": 碳水化合物(克),
-      "fat_g": 脂肪(克)
+      "confidence": 整体置信度(0-100),
+      "estimated_weight_g": {"value": 估算重量, "confidence": 置信度(0-100)},
+      "calories": {"value": 热量(大卡), "confidence": 置信度(0-100)},
+      "protein_g": {"value": 蛋白质(克), "confidence": 置信度(0-100)},
+      "carbs_g": {"value": 碳水化合物(克), "confidence": 置信度(0-100)},
+      "fat_g": {"value": 脂肪(克), "confidence": 置信度(0-100)}
     }
   ],
-  "total_calories": 总热量,
-  "confidence": "high" | "medium" | "low"
+  "total_calories": 总热量
 }
+
+置信度评估标准:
+- 90-100: 非常确定，食物清晰可见
+- 70-89: 较为确定，基本正确但可能有小误差
+- 50-69: 中等确定，建议用户确认
+- 0-49: 不确定，强烈建议用户检查
 
 如果图片模糊或无法识别，返回:
 {
@@ -168,7 +179,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    return NextResponse.json(result);
+    // Normalize response to ensure all values have confidence info
+    // Handle both old format (plain numbers) and new format (with confidence)
+    const normalizedFoods = result.foods.map(food => {
+      const normalizeValue = (val: number | ConfidenceValue, defaultConfidence = 75): ConfidenceValue => {
+        if (typeof val === 'number') {
+          return { value: val, confidence: defaultConfidence };
+        }
+        return val;
+      };
+
+      const overallConfidence = food.confidence ?? 75;
+
+      return {
+        food_name: food.food_name,
+        confidence: overallConfidence,
+        estimated_weight_g: normalizeValue(food.estimated_weight_g, overallConfidence),
+        calories: normalizeValue(food.calories, overallConfidence),
+        protein_g: normalizeValue(food.protein_g, overallConfidence),
+        carbs_g: normalizeValue(food.carbs_g, overallConfidence),
+        fat_g: normalizeValue(food.fat_g, overallConfidence),
+      };
+    });
+
+    return NextResponse.json({
+      foods: normalizedFoods,
+      total_calories: result.total_calories,
+    });
   } catch (error) {
     console.error("Recognize food error:", error);
     const errorMessage = error instanceof Error ? error.message : "识别失败，请重试";
