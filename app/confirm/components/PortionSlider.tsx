@@ -14,6 +14,32 @@ interface PortionSliderProps {
   step?: number;
 }
 
+const DEFAULT_PRESETS = [
+  { label: "50%", value: 50 },
+  { label: "75%", value: 75 },
+  { label: "100%", value: 100 },
+  { label: "125%", value: 125 },
+  { label: "150%", value: 150 },
+  { label: "200%", value: 200 },
+] as const;
+
+const PERCENTAGE_THRESHOLDS = {
+  low: 75,
+  high: 125,
+} as const;
+
+function getSliderColor(percentage: number): string {
+  if (percentage < PERCENTAGE_THRESHOLDS.low) return "bg-blue-500";
+  if (percentage > PERCENTAGE_THRESHOLDS.high) return "bg-orange-500";
+  return "bg-primary";
+}
+
+function getTextColor(percentage: number): string {
+  if (percentage < PERCENTAGE_THRESHOLDS.low) return "text-blue-600 dark:text-blue-400";
+  if (percentage > PERCENTAGE_THRESHOLDS.high) return "text-orange-600 dark:text-orange-400";
+  return "text-primary";
+}
+
 export function PortionSlider({
   value,
   originalValue,
@@ -30,22 +56,16 @@ export function PortionSlider({
 
   // Calculate current percentage
   const percentage = Math.round((value / originalValue) * 100);
+  const colorClass = getSliderColor(percentage);
+  const textClass = getTextColor(percentage);
 
-  // Calculate color based on percentage
-  const getColor = () => {
-    if (percentage < 75) return "bg-blue-500";
-    if (percentage > 125) return "bg-orange-500";
-    return "bg-primary";
-  };
-
-  const getTextColor = () => {
-    if (percentage < 75) return "text-blue-600 dark:text-blue-400";
-    if (percentage > 125) return "text-orange-600 dark:text-orange-400";
-    return "text-primary";
+  // Calculate position percentage for slider (normalized to min-max range)
+  const getPositionPercent = (pct: number): number => {
+    return ((pct - minPercentage) / (maxPercentage - minPercentage)) * 100;
   };
 
   // Handle slider change
-  const handleSliderChange = useCallback((clientX: number) => {
+  const handleSliderChange = useCallback((clientX: number): void => {
     if (!trackRef.current) return;
 
     const rect = trackRef.current.getBoundingClientRect();
@@ -65,69 +85,63 @@ export function PortionSlider({
   }, [originalValue, minPercentage, maxPercentage, step, onChange, onPercentageChange]);
 
   // Handle mouse/touch events
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent): void => {
     setIsDragging(true);
     handleSliderChange(e.clientX);
-  };
+  }, [handleSliderChange]);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent): void => {
     if (isDragging) {
       handleSliderChange(e.clientX);
     }
   }, [isDragging, handleSliderChange]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((): void => {
     setIsDragging(false);
   }, []);
 
   // Add/remove event listeners for drag
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-    }
+    if (!isDragging) return;
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Touch events for mobile
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent): void => {
     setIsDragging(true);
     handleSliderChange(e.touches[0].clientX);
-  };
+  }, [handleSliderChange]);
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
+  const handleTouchMove = useCallback((e: TouchEvent): void => {
     if (isDragging) {
       handleSliderChange(e.touches[0].clientX);
     }
   }, [isDragging, handleSliderChange]);
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback((): void => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener("touchmove", handleTouchMove, { passive: true });
-      window.addEventListener("touchend", handleTouchEnd);
-      return () => {
-        window.removeEventListener("touchmove", handleTouchMove);
-        window.removeEventListener("touchend", handleTouchEnd);
-      };
-    }
+    if (!isDragging) return;
+
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
   }, [isDragging, handleTouchMove, handleTouchEnd]);
 
-  // Quick preset buttons
-  const presets = [
-    { label: "50%", value: 50 },
-    { label: "75%", value: 75 },
-    { label: "100%", value: 100 },
-    { label: "125%", value: 125 },
-    { label: "150%", value: 150 },
-    { label: "200%", value: 200 },
-  ];
+  const positionPercent = getPositionPercent(percentage);
 
   return (
     <div className="w-full">
@@ -137,7 +151,7 @@ export function PortionSlider({
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => setIsOpen(true)}
-          className={`w-full flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary hover:bg-primary/5 transition-all ${getTextColor()}`}
+          className={`w-full flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-primary hover:bg-primary/5 transition-all ${textClass}`}
         >
           <span className="text-sm font-medium dark:text-text-dark-primary">分量调整</span>
           <div className="flex items-center gap-2">
@@ -176,7 +190,7 @@ export function PortionSlider({
 
             {/* Current value display */}
             <div className="text-center">
-              <span className={`text-2xl font-bold ${getTextColor()}`}>
+              <span className={`text-2xl font-bold ${textClass}`}>
                 {value}g
               </span>
               <span className="text-sm text-gray-500 dark:text-text-dark-secondary ml-2">
@@ -193,37 +207,34 @@ export function PortionSlider({
             >
               {/* Fill */}
               <motion.div
-                className={`absolute h-full ${getColor()} rounded-full`}
-                style={{ width: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
-                animate={{ width: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
+                className={`absolute h-full ${colorClass} rounded-full`}
+                style={{ width: `${positionPercent}%` }}
+                animate={{ width: `${positionPercent}%` }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
 
               {/* Thumb */}
               <motion.div
                 ref={sliderRef}
-                className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 ${getColor()} rounded-full shadow-lg border-2 border-white dark:border-gray-900 cursor-grab active:cursor-grabbing`}
-                style={{ left: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
-                animate={{ left: `${((percentage - minPercentage) / (maxPercentage - minPercentage)) * 100}%` }}
+                className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 ${colorClass} rounded-full shadow-lg border-2 border-white dark:border-gray-900 cursor-grab active:cursor-grabbing`}
+                style={{ left: `${positionPercent}%` }}
+                animate={{ left: `${positionPercent}%` }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
 
               {/* Tick marks */}
-              {presets.map((preset) => {
-                const left = ((preset.value - minPercentage) / (maxPercentage - minPercentage)) * 100;
-                return (
-                  <div
-                    key={preset.value}
-                    className="absolute top-0 bottom-0 w-0.5 bg-gray-300 dark:bg-gray-700"
-                    style={{ left: `${left}%` }}
-                  />
-                );
-              })}
+              {DEFAULT_PRESETS.map((preset) => (
+                <div
+                  key={preset.value}
+                  className="absolute top-0 bottom-0 w-0.5 bg-gray-300 dark:bg-gray-700"
+                  style={{ left: `${getPositionPercent(preset.value)}%` }}
+                />
+              ))}
             </div>
 
             {/* Preset buttons */}
             <div className="flex justify-between gap-1">
-              {presets.map((preset) => (
+              {DEFAULT_PRESETS.map((preset) => (
                 <button
                   key={preset.value}
                   onClick={() => {
@@ -233,7 +244,7 @@ export function PortionSlider({
                   }}
                   className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     percentage === preset.value
-                      ? `${getTextColor()} ${getColor()} text-white`
+                      ? `${textClass} ${colorClass} text-white`
                       : "bg-gray-100 dark:bg-background-dark text-gray-600 dark:text-text-dark-secondary hover:bg-gray-200 dark:hover:bg-gray-800"
                   }`}
                 >

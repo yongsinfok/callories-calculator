@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, X, RefreshCw, Check } from "lucide-react";
+
+const AUTO_UPDATE_KEY = "pwa-auto-update";
+const SKIP_WAITING_MSG = { type: "SKIP_WAITING" };
 
 interface PWAUpdatePromptProps {
   className?: string;
@@ -13,69 +16,70 @@ export function PWAUpdatePrompt({ className }: PWAUpdatePromptProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [autoUpdate, setAutoUpdate] = useState(false);
 
+  // Load auto-update preference on mount
   useEffect(() => {
-    // Load auto-update preference
-    const savedAutoUpdate = localStorage.getItem("pwa-auto-update") === "true";
-    setAutoUpdate(savedAutoUpdate);
+    setAutoUpdate(localStorage.getItem(AUTO_UPDATE_KEY) === "true");
   }, []);
 
+  // Listen for service worker updates
   useEffect(() => {
-    // Listen for service worker updates
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      // Handle controller change (new service worker activated)
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        // New service worker is active, reload the page
-        window.location.reload();
-      });
-
-      // Listen for the custom update event from our service worker registration
-      const handleUpdateAvailable = () => {
-        // Don't show prompt if auto-update is enabled
-        if (localStorage.getItem("pwa-auto-update") !== "true") {
-          setShowPrompt(true);
-        }
-      };
-
-      window.addEventListener("sw-update-available", handleUpdateAvailable);
-
-      return () => {
-        window.removeEventListener("sw-update-available", handleUpdateAvailable);
-      };
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
     }
+
+    // Handle controller change (new service worker activated)
+    const handleControllerChange = (): void => {
+      window.location.reload();
+    };
+
+    // Listen for the custom update event from service worker registration
+    const handleUpdateAvailable = (): void => {
+      if (localStorage.getItem(AUTO_UPDATE_KEY) !== "true") {
+        setShowPrompt(true);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    window.addEventListener("sw-update-available", handleUpdateAvailable);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      window.removeEventListener("sw-update-available", handleUpdateAvailable);
+    };
   }, []);
 
-  const handleUpdate = () => {
+  // Tell the waiting service worker to skip waiting and become active
+  const sendSkipWaiting = useCallback((): void => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (registration?.waiting) {
+        registration.waiting.postMessage(SKIP_WAITING_MSG);
+      }
+    });
+  }, []);
+
+  const handleUpdate = useCallback(() => {
     setIsUpdating(true);
+    sendSkipWaiting();
+  }, [sendSkipWaiting]);
 
-    // Tell the waiting service worker to skip waiting and become active
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration && registration.waiting) {
-          // Send message to waiting service worker to skip waiting
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
-      });
-    }
-  };
-
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     setShowPrompt(false);
-  };
+  }, []);
 
-  const handleAutoUpdateToggle = () => {
+  const handleAutoUpdateToggle = useCallback(() => {
     const newValue = !autoUpdate;
     setAutoUpdate(newValue);
-    localStorage.setItem("pwa-auto-update", String(newValue));
+    localStorage.setItem(AUTO_UPDATE_KEY, String(newValue));
 
     // If enabling auto-update, apply it immediately if there's a waiting SW
-    if (newValue && typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration && registration.waiting) {
-          registration.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
-      });
+    if (newValue) {
+      sendSkipWaiting();
     }
-  };
+  }, [autoUpdate, sendSkipWaiting]);
 
   return (
     <AnimatePresence>

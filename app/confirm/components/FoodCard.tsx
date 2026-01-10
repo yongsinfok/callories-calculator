@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Trash2, Undo2 } from "lucide-react";
-import { FoodEntry } from "../types";
+import type { FoodEntry } from "../types";
 import { ConfidenceBadge } from "./ConfidenceBadge";
 import { EditableValue } from "./EditableValue";
 import { PortionSlider } from "./PortionSlider";
@@ -11,11 +11,17 @@ import { PortionSlider } from "./PortionSlider";
 interface FoodCardProps {
   food: FoodEntry;
   index: number;
-  onUpdate: (index: number, field: keyof FoodEntry, value: any) => void;
+  onUpdate: (index: number, field: keyof FoodEntry, value: unknown) => void;
   onDelete: (index: number) => void;
   onUndo?: (index: number) => void;
   showDelete?: boolean;
 }
+
+const CONFIDENCE_THRESHOLD = 50;
+const HIGHLIGHT_THRESHOLD = 70;
+const DELETE_DELAY = 300;
+
+type NutritionField = "calories" | "protein_g" | "carbs_g" | "fat_g";
 
 export function FoodCard({
   food,
@@ -25,73 +31,77 @@ export function FoodCard({
   onUndo,
   showDelete = true,
 }: FoodCardProps) {
-  const [showSlider, setShowSlider] = useState(false);
-  const [cascadingEdits, setCascadingEdits] = useState(true);
+  const [cascadingEdits] = useState(true);
   const [originalWeight] = useState(food.estimated_weight_g.value);
   const [lastDeleted, setLastDeleted] = useState(false);
 
+  // Update a confidence value field
+  const updateConfidenceValue = useCallback(
+    (field: NutritionField | "estimated_weight_g", newValue: number): void => {
+      const currentField = food[field];
+      if (typeof currentField === "object" && "value" in currentField) {
+        onUpdate(index, field, { ...currentField, value: newValue });
+      }
+    },
+    [food, index, onUpdate]
+  );
+
   // Handle weight change with cascading recalculation
-  const handleWeightChange = useCallback((newWeight: number) => {
-    const oldWeight = food.estimated_weight_g.value;
-    const ratio = newWeight / oldWeight;
+  const handleWeightChange = useCallback(
+    (newWeight: number): void => {
+      const oldWeight = food.estimated_weight_g.value;
+      const ratio = newWeight / oldWeight;
 
-    // Update weight
-    onUpdate(index, "estimated_weight_g", {
-      ...food.estimated_weight_g,
-      value: newWeight,
-    });
+      // Update weight
+      updateConfidenceValue("estimated_weight_g", newWeight);
 
-    // Cascade to other values if enabled
-    if (cascadingEdits) {
-      onUpdate(index, "calories", {
-        ...food.calories,
-        value: Math.round(food.calories.value * ratio),
-      });
-      onUpdate(index, "protein_g", {
-        ...food.protein_g,
-        value: parseFloat((food.protein_g.value * ratio).toFixed(1)),
-      });
-      onUpdate(index, "carbs_g", {
-        ...food.carbs_g,
-        value: parseFloat((food.carbs_g.value * ratio).toFixed(1)),
-      });
-      onUpdate(index, "fat_g", {
-        ...food.fat_g,
-        value: parseFloat((food.fat_g.value * ratio).toFixed(1)),
-      });
-    }
-  }, [food, index, onUpdate, cascadingEdits]);
+      // Cascade to other values if enabled
+      if (cascadingEdits) {
+        const nutritionFields: NutritionField[] = ["calories", "protein_g", "carbs_g", "fat_g"];
+        nutritionFields.forEach((field) => {
+          const currentValue = food[field].value;
+          const scaledValue =
+            field === "calories"
+              ? Math.round(currentValue * ratio)
+              : parseFloat((currentValue * ratio).toFixed(1));
+          updateConfidenceValue(field, scaledValue);
+        });
+      }
+    },
+    [food, cascadingEdits, updateConfidenceValue]
+  );
 
   // Handle individual value change
-  const handleValueChange = useCallback((field: keyof FoodEntry) => (newValue: number) => {
-    const currentField = food[field as keyof typeof food];
-    if (typeof currentField === "object" && "value" in currentField) {
-      onUpdate(index, field, {
-        ...currentField,
-        value: newValue,
-      });
-    }
-  }, [food, index, onUpdate]);
+  const handleValueChange = useCallback(
+    (field: keyof FoodEntry) => (newValue: number): void => {
+      const currentField = food[field as keyof typeof food];
+      if (typeof currentField === "object" && "value" in currentField) {
+        onUpdate(index, field, { ...currentField, value: newValue });
+      }
+    },
+    [food, index, onUpdate]
+  );
 
   // Handle name change
-  const handleNameChange = useCallback((newName: string) => {
-    onUpdate(index, "food_name", newName);
-  }, [index, onUpdate]);
+  const handleNameChange = useCallback(
+    (newName: string): void => {
+      onUpdate(index, "food_name", newName);
+    },
+    [index, onUpdate]
+  );
 
   // Handle delete with undo
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback((): void => {
     setLastDeleted(true);
     setTimeout(() => {
       onDelete(index);
-    }, 300);
+    }, DELETE_DELAY);
   }, [index, onDelete]);
 
   // Handle undo
-  const handleUndo = useCallback(() => {
+  const handleUndo = useCallback((): void => {
     setLastDeleted(false);
-    if (onUndo) {
-      onUndo(index);
-    }
+    onUndo?.(index);
   }, [index, onUndo]);
 
   if (lastDeleted) {
@@ -115,15 +125,18 @@ export function FoodCard({
     );
   }
 
+  const isLowConfidence = food.confidence < CONFIDENCE_THRESHOLD;
+  const borderClass = isLowConfidence
+    ? "border-red-200 dark:border-red-800"
+    : "border-gray-100 dark:border-gray-800";
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`bg-white dark:bg-background-dark-secondary rounded-2xl p-5 shadow-sm border-2 transition-all ${
-        food.confidence < 50 ? "border-red-200 dark:border-red-800" : "border-gray-100 dark:border-gray-800"
-      }`}
+      className={`bg-white dark:bg-background-dark-secondary rounded-2xl p-5 shadow-sm border-2 transition-all ${borderClass}`}
     >
       {/* Card header with name and confidence */}
       <div className="flex items-start justify-between mb-4">
@@ -139,7 +152,7 @@ export function FoodCard({
       </div>
 
       {/* Low confidence warning */}
-      {food.confidence < 50 && (
+      {isLowConfidence && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
@@ -171,7 +184,7 @@ export function FoodCard({
           unit="kcal"
           onSave={handleValueChange("calories")}
           decimals={0}
-          highlighted={food.calories.confidence < 70}
+          highlighted={food.calories.confidence < HIGHLIGHT_THRESHOLD}
         />
 
         {/* Weight */}
@@ -187,7 +200,7 @@ export function FoodCard({
             });
           }}
           decimals={0}
-          highlighted={food.estimated_weight_g.confidence < 70}
+          highlighted={food.estimated_weight_g.confidence < HIGHLIGHT_THRESHOLD}
         />
       </div>
 
@@ -200,7 +213,7 @@ export function FoodCard({
           unit="g"
           onSave={handleValueChange("protein_g")}
           decimals={1}
-          highlighted={food.protein_g.confidence < 70}
+          highlighted={food.protein_g.confidence < HIGHLIGHT_THRESHOLD}
         />
 
         <EditableValue
@@ -210,7 +223,7 @@ export function FoodCard({
           unit="g"
           onSave={handleValueChange("carbs_g")}
           decimals={1}
-          highlighted={food.carbs_g.confidence < 70}
+          highlighted={food.carbs_g.confidence < HIGHLIGHT_THRESHOLD}
         />
 
         <EditableValue
@@ -220,7 +233,7 @@ export function FoodCard({
           unit="g"
           onSave={handleValueChange("fat_g")}
           decimals={1}
-          highlighted={food.fat_g.confidence < 70}
+          highlighted={food.fat_g.confidence < HIGHLIGHT_THRESHOLD}
         />
       </div>
 

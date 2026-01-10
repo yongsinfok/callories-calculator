@@ -2,98 +2,107 @@
 
 import { useEffect } from "react";
 
+const AUTO_UPDATE_KEY = "pwa-auto-update";
+const SKIP_WAITING_MSG = { type: "SKIP_WAITING" };
+const UPDATE_EVENT = "sw-update-available";
+const UPDATE_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+function isAutoUpdateEnabled(): boolean {
+  return localStorage.getItem(AUTO_UPDATE_KEY) === "true";
+}
+
+function skipWaiting(registration: ServiceWorkerRegistration): void {
+  if (registration.waiting) {
+    registration.waiting.postMessage(SKIP_WAITING_MSG);
+  }
+}
+
+function notifyUpdateAvailable(): void {
+  window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+}
+
 export function PWAProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Initialize custom service worker handling
-    const initSW = async () => {
+    const initSW = async (): Promise<(() => void) | undefined> => {
       if (typeof window === "undefined") return;
       if (!("serviceWorker" in navigator)) return;
 
-      try {
-        // Wait for next-pwa to register the service worker
-        // Then add our custom update handling
-        const registration = await navigator.serviceWorker.getRegistration();
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
 
-        if (registration) {
-          // Check user's preference for auto-update
-          const autoUpdate = localStorage.getItem("pwa-auto-update") === "true";
+      const autoUpdate = isAutoUpdateEnabled();
 
-          // Function to check for updates
-          const checkForUpdates = async () => {
-            try {
-              await registration.update();
-            } catch {
-              // Ignore update failures (might be offline)
-            }
-          };
-
-          // Listen for the waiting service worker
-          const showUpdateIfWaiting = () => {
-            if (registration.waiting) {
-              if (autoUpdate) {
-                // Automatically activate new service worker
-                registration.waiting.postMessage({ type: "SKIP_WAITING" });
-              } else {
-                window.dispatchEvent(new CustomEvent("sw-update-available"));
-              }
-            }
-          };
-
-          // Check if there's already a waiting service worker
-          showUpdateIfWaiting();
-
-          // Listen for new service worker installation
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing;
-            if (!newWorker) return;
-
-            newWorker.addEventListener("statechange", () => {
-              if (newWorker.state === "installed" && registration.waiting) {
-                // New version is ready
-                if (autoUpdate) {
-                  // Auto-update: skip waiting and reload
-                  registration.waiting.postMessage({ type: "SKIP_WAITING" });
-                } else {
-                  window.dispatchEvent(new CustomEvent("sw-update-available"));
-                }
-              }
-            });
-          });
-
-          // Handle messages from service worker (for skipWaiting response)
-          navigator.serviceWorker.addEventListener("message", (event) => {
-            if (event.data?.type === "SKIP_WAITING") {
-              // Service worker is activating, reload the page
-              window.location.reload();
-            }
-          });
-
-          // Check for updates when window gets focus
-          const handleFocus = () => {
-            checkForUpdates();
-          };
-          window.addEventListener("focus", handleFocus);
-
-          // Periodic update check (every 10 minutes)
-          const updateInterval = setInterval(checkForUpdates, 10 * 60 * 1000);
-
-          // Initial check after a short delay
-          setTimeout(checkForUpdates, 5000);
-
-          return () => {
-            window.removeEventListener("focus", handleFocus);
-            clearInterval(updateInterval);
-          };
+      const handleUpdateAvailable = (): void => {
+        if (registration.waiting) {
+          if (autoUpdate) {
+            skipWaiting(registration);
+          } else {
+            notifyUpdateAvailable();
+          }
         }
-      } catch (error) {
-        console.error("[PWA] Error setting up service worker:", error);
-      }
+      };
+
+      // Check for existing waiting service worker
+      handleUpdateAvailable();
+
+      // Listen for new service worker installation
+      registration.addEventListener("updatefound", () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && registration.waiting) {
+            handleUpdateAvailable();
+          }
+        });
+      });
+
+      // Handle service worker messages
+      const handleMessage = (event: MessageEvent): void => {
+        if (event.data?.type === "SKIP_WAITING") {
+          window.location.reload();
+        }
+      };
+      navigator.serviceWorker.addEventListener("message", handleMessage);
+
+      // Set up periodic update checks
+      const checkForUpdates = async (): Promise<void> => {
+        try {
+          await registration.update();
+        } catch {
+          // Ignore update failures (might be offline)
+        }
+      };
+
+      const handleFocus = (): void => {
+        checkForUpdates();
+      };
+      window.addEventListener("focus", handleFocus);
+
+      const updateInterval = setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL);
+      setTimeout(checkForUpdates, 5000); // Initial check
+
+      return () => {
+        window.removeEventListener("focus", handleFocus);
+        clearInterval(updateInterval);
+        navigator.serviceWorker.removeEventListener("message", handleMessage);
+      };
     };
 
-    // Initialize after a short delay to ensure next-pwa has registered
-    const timer = setTimeout(initSW, 1000);
+    const initTimer = setTimeout(() => {
+      initSW().then((cleanup) => {
+        if (cleanup) {
+          (initTimer as unknown as { cleanup: () => void }).cleanup = cleanup;
+        }
+      });
+    }, 1000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(initTimer);
+      if (typeof (initTimer as unknown as { cleanup?: () => void }).cleanup === "function") {
+        (initTimer as unknown as { cleanup: () => void }).cleanup();
+      }
+    };
   }, []);
 
   return <>{children}</>;

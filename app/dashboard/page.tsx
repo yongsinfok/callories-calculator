@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/SupabaseProvider";
 import { supabase } from "@/lib/supabase";
@@ -12,7 +12,6 @@ import {
   Flame,
   Calendar,
   Trash2,
-  ChevronRight,
   Wheat,
   Beef,
   Droplet,
@@ -41,6 +40,43 @@ interface MacroGoals {
   fat: number;
 }
 
+// Macro ratios for balanced diet
+const MACRO_RATIOS = {
+  protein: { percent: 0.30, calPerGram: 4 },
+  carbs: { percent: 0.40, calPerGram: 4 },
+  fat: { percent: 0.30, calPerGram: 9 },
+} as const;
+
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: "早餐",
+  lunch: "午餐",
+  dinner: "晚餐",
+  snack: "加餐",
+};
+
+// Calculate macro goals based on calorie target
+function getMacroGoals(calorieTarget: number): MacroGoals {
+  return {
+    protein: Math.round((calorieTarget * MACRO_RATIOS.protein.percent) / MACRO_RATIOS.protein.calPerGram),
+    carbs: Math.round((calorieTarget * MACRO_RATIOS.carbs.percent) / MACRO_RATIOS.carbs.calPerGram),
+    fat: Math.round((calorieTarget * MACRO_RATIOS.fat.percent) / MACRO_RATIOS.fat.calPerGram),
+  };
+}
+
+// Calculate macro progress percentage
+function getMacroProgress(current: number, goal: number): number {
+  if (!goal) return 0;
+  return Math.min((current / goal) * 100, 100);
+}
+
+// Get macro color based on progress
+function getMacroColor(progress: number): string {
+  if (progress >= 100) return "bg-green-500";
+  if (progress >= 80) return "bg-primary";
+  if (progress >= 50) return "bg-yellow-500";
+  return "bg-orange-500";
+}
+
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -58,13 +94,12 @@ export default function DashboardPage() {
     } else if (user) {
       loadData();
     }
-  }, [user, loading]);
+  }, [user, loading, router]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async (): Promise<void> => {
     if (!user) return;
 
     try {
-      // Load profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("daily_calorie_target")
@@ -75,7 +110,6 @@ export default function DashboardPage() {
         setProfile(profileData);
       }
 
-      // Load today's entries
       const today = new Date().toISOString().split("T")[0];
       const { data: entriesData } = await supabase
         .from("food_entries")
@@ -86,35 +120,30 @@ export default function DashboardPage() {
 
       if (entriesData) {
         setEntries(entriesData);
-        const total = entriesData.reduce(
-          (sum, entry) => sum + entry.calories,
-          0
+
+        const totals = entriesData.reduce(
+          (acc, entry) => ({
+            calories: acc.calories + entry.calories,
+            protein: acc.protein + (entry.protein_g || 0),
+            carbs: acc.carbs + (entry.carbs_g || 0),
+            fat: acc.fat + (entry.fat_g || 0),
+          }),
+          { calories: 0, protein: 0, carbs: 0, fat: 0 }
         );
-        const protein = entriesData.reduce(
-          (sum, entry) => sum + (entry.protein_g || 0),
-          0
-        );
-        const carbs = entriesData.reduce(
-          (sum, entry) => sum + (entry.carbs_g || 0),
-          0
-        );
-        const fat = entriesData.reduce(
-          (sum, entry) => sum + (entry.fat_g || 0),
-          0
-        );
-        setTotalCalories(total);
-        setTotalProtein(Math.round(protein));
-        setTotalCarbs(Math.round(carbs));
-        setTotalFat(Math.round(fat));
+
+        setTotalCalories(totals.calories);
+        setTotalProtein(Math.round(totals.protein));
+        setTotalCarbs(Math.round(totals.carbs));
+        setTotalFat(Math.round(totals.fat));
       }
     } catch (err) {
       console.error("加载数据失败:", err);
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [user]);
 
-  const handleDeleteEntry = async (id: string) => {
+  const handleDeleteEntry = useCallback(async (id: string): Promise<void> => {
     if (!user) return;
 
     try {
@@ -124,28 +153,19 @@ export default function DashboardPage() {
         .eq("id", id)
         .eq("user_id", user.id);
 
-      setEntries(entries.filter((e) => e.id !== id));
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+
       const deletedEntry = entries.find((e) => e.id === id);
       if (deletedEntry) {
-        setTotalCalories(totalCalories - deletedEntry.calories);
-        setTotalProtein(Math.max(0, totalProtein - (deletedEntry.protein_g || 0)));
-        setTotalCarbs(Math.max(0, totalCarbs - (deletedEntry.carbs_g || 0)));
-        setTotalFat(Math.max(0, totalFat - (deletedEntry.fat_g || 0)));
+        setTotalCalories((prev) => Math.max(0, prev - deletedEntry.calories));
+        setTotalProtein((prev) => Math.max(0, prev - (deletedEntry.protein_g || 0)));
+        setTotalCarbs((prev) => Math.max(0, prev - (deletedEntry.carbs_g || 0)));
+        setTotalFat((prev) => Math.max(0, prev - (deletedEntry.fat_g || 0)));
       }
     } catch (err) {
       console.error("删除失败:", err);
     }
-  };
-
-  const getMealTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      breakfast: "早餐",
-      lunch: "午餐",
-      dinner: "晚餐",
-      snack: "加餐",
-    };
-    return labels[type] || "其他";
-  };
+  }, [user, entries]);
 
   const remainingCalories = profile
     ? profile.daily_calorie_target - totalCalories
@@ -153,33 +173,7 @@ export default function DashboardPage() {
   const progress = profile
     ? (totalCalories / profile.daily_calorie_target) * 100
     : 0;
-
-  // Calculate macro goals based on calorie target (balanced diet: 30% protein, 40% carbs, 30% fat)
-  const getMacroGoals = (calorieTarget: number): MacroGoals => {
-    // Protein: 30% of calories, 4 calories per gram
-    // Carbs: 40% of calories, 4 calories per gram
-    // Fat: 30% of calories, 9 calories per gram
-    return {
-      protein: Math.round((calorieTarget * 0.30) / 4),
-      carbs: Math.round((calorieTarget * 0.40) / 4),
-      fat: Math.round((calorieTarget * 0.30) / 9),
-    };
-  };
-
   const macroGoals = profile ? getMacroGoals(profile.daily_calorie_target) : null;
-
-  // Calculate macro progress percentages
-  const getMacroProgress = (current: number, goal: number) => {
-    if (!goal) return 0;
-    return Math.min((current / goal) * 100, 100);
-  };
-
-  const getMacroColor = (progress: number) => {
-    if (progress >= 100) return "bg-green-500";
-    if (progress >= 80) return "bg-primary";
-    if (progress >= 50) return "bg-yellow-500";
-    return "bg-orange-500";
-  };
 
   if (loading || isLoadingData) {
     return (
@@ -397,7 +391,7 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                            {getMealTypeLabel(entry.meal_type || "snack")}
+                            {MEAL_TYPE_LABELS[entry.meal_type] || MEAL_TYPE_LABELS.snack}
                           </span>
                         </div>
                         <h3 className="font-semibold text-text-primary dark:text-text-dark-primary mb-1">

@@ -18,6 +18,34 @@ interface EditableValueProps {
   highlighted?: boolean;
 }
 
+const CONFIDENCE_COLORS = {
+  low: "text-amber-600 dark:text-amber-400",
+  medium: "text-amber-500 dark:text-amber-500",
+  normal: "text-gray-700 dark:text-text-dark-primary",
+} as const;
+
+const CONFIDENCE_BG = {
+  low: "bg-amber-50 dark:bg-amber-900/20",
+} as const;
+
+function getConfidenceColor(
+  level: ReturnType<typeof getConfidenceLevel>,
+  highlighted: boolean
+): string {
+  if (level === "low") return CONFIDENCE_COLORS.low;
+  if (level === "medium") return CONFIDENCE_COLORS.medium;
+  if (highlighted) return CONFIDENCE_COLORS.low;
+  return CONFIDENCE_COLORS.normal;
+}
+
+function getConfidenceBg(
+  level: ReturnType<typeof getConfidenceLevel>,
+  highlighted: boolean
+): string {
+  if (level === "low" || highlighted) return CONFIDENCE_BG.low;
+  return "";
+}
+
 export function EditableValue({
   value,
   confidence,
@@ -37,19 +65,8 @@ export function EditableValue({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const level = getConfidenceLevel(confidence);
-
-  // Get color based on confidence level
-  const getColor = () => {
-    if (level === "low") return "text-amber-600 dark:text-amber-400";
-    if (level === "medium") return "text-amber-500 dark:text-amber-500";
-    return "text-gray-700 dark:text-text-dark-primary";
-  };
-
-  // Get background tint for low confidence
-  const getBgColor = () => {
-    if (level === "low" || highlighted) return "bg-amber-50 dark:bg-amber-900/20";
-    return "";
-  };
+  const colorClass = getConfidenceColor(level, highlighted);
+  const bgClass = getConfidenceBg(level, highlighted);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -59,8 +76,7 @@ export function EditableValue({
     }
   }, [isEditing]);
 
-  // Handle save
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback((): void => {
     const numValue = parseFloat(editValue);
     if (!isNaN(numValue) && numValue >= min && numValue <= max) {
       onSave(numValue);
@@ -69,50 +85,50 @@ export function EditableValue({
     setHasChanged(false);
   }, [editValue, min, max, onSave]);
 
-  // Handle cancel
-  const handleCancel = () => {
+  const handleCancel = useCallback((): void => {
     setEditValue(value.toString());
     setIsEditing(false);
     setHasChanged(false);
-  };
+  }, [value]);
 
-  // Handle keyboard
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent): void => {
     if (e.key === "Enter") {
       handleSave();
     } else if (e.key === "Escape") {
       handleCancel();
-    } else if (e.key === "ArrowUp" && !isEditing) {
-      // Desktop: increment by arrow keys
-      const newValue = Math.min(value + (decimals === 0 ? 10 : 1), max);
-      onSave(newValue);
-    } else if (e.key === "ArrowDown" && !isEditing) {
-      const newValue = Math.max(value - (decimals === 0 ? 10 : 1), min);
-      onSave(newValue);
+    } else if (!isEditing) {
+      const step = decimals === 0 ? 10 : 1;
+      if (e.key === "ArrowUp") {
+        onSave(Math.min(value + step, max));
+      } else if (e.key === "ArrowDown") {
+        onSave(Math.max(value - step, min));
+      }
     }
-  };
+  }, [decimals, handleSave, handleCancel, isEditing, max, min, onSave, value]);
 
-  // Handle value change
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     setEditValue(e.target.value);
     setHasChanged(true);
-  };
+  }, []);
 
-  // Handle blur (save on click away)
-  const handleBlur = () => {
+  const handleBlur = useCallback((): void => {
     if (hasChanged) {
       handleSave();
     } else {
       setIsEditing(false);
     }
-  };
+  }, [hasChanged, handleSave]);
+
+  const startEditing = useCallback(() => {
+    if (!isEditing) setIsEditing(true);
+  }, [isEditing]);
 
   const displayValue = decimals === 0 ? Math.round(value) : value.toFixed(decimals);
 
   return (
     <div
-      className={`relative inline-block w-full ${getBgColor()} rounded-lg transition-colors`}
-      onClick={() => !isEditing && setIsEditing(true)}
+      className={`relative inline-block w-full ${bgClass} rounded-lg transition-colors`}
+      onClick={startEditing}
     >
       {label && (
         <label className="block text-xs font-medium text-gray-500 dark:text-text-dark-secondary mb-1.5">
@@ -127,13 +143,13 @@ export function EditableValue({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`flex items-center justify-between p-2.5 rounded-lg border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:bg-white dark:hover:bg-background-dark-secondary cursor-pointer transition-all ${getColor()}`}
+            className={`flex items-center justify-between p-2.5 rounded-lg border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 hover:bg-white dark:hover:bg-background-dark-secondary cursor-pointer transition-all ${colorClass}`}
           >
-            <span className="font-medium text-lg">
-              {displayValue}
-            </span>
+            <span className="font-medium text-lg">{displayValue}</span>
             {showUnit && (
-              <span className="text-sm text-gray-400 dark:text-text-dark-tertiary ml-1">{unit}</span>
+              <span className="text-sm text-gray-400 dark:text-text-dark-tertiary ml-1">
+                {unit}
+              </span>
             )}
             {(level === "low" || highlighted) && (
               <span className="ml-2 text-xs text-amber-500 dark:text-amber-400">✎</span>
@@ -155,7 +171,7 @@ export function EditableValue({
               onChange={handleChange}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
-              className={`w-full p-2.5 rounded-lg border-2 border-primary text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 ${getColor()} ${getBgColor()}`}
+              className={`w-full p-2.5 rounded-lg border-2 border-primary text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 ${colorClass} ${bgClass}`}
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-text-dark-tertiary pointer-events-none">
               {unit}
